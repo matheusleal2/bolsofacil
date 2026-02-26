@@ -51,6 +51,39 @@ export function Auth({ onLogin }: { onLogin: (userId: string, userName: string) 
     if (!authForm.email.trim()) { setError('Informe seu e-mail.'); return; }
     setLoading(true);
     try {
+      // Pré-verificação: tenta login com senha inválida para detectar se o e-mail existe.
+      // Supabase retorna "Invalid login credentials" para senha errada (usuário existe)
+      // e pode retornar erro diferente ou mesma mensagem quando usuário não existe.
+      // Usamos signInWithPassword como sonda — se o status HTTP for 400 com código
+      // específico, sabemos que o e-mail não está registrado.
+      const { error: probeError } = await supabase.auth.signInWithPassword({
+        email: authForm.email,
+        password: '__BOLSOFACIL_PROBE_PASSWORD_THAT_WILL_NEVER_MATCH__',
+      });
+
+      if (probeError) {
+        const msg = probeError.message?.toLowerCase() ?? '';
+        // Quando o e-mail NÃO existe, Supabase (com proteção de enumeração desabilitada)
+        // retorna mensagens como "Email not found", "user not found", etc.
+        // Quando o e-mail EXISTE mas a senha está errada, retorna "invalid login credentials".
+        const emailNotFound =
+          msg.includes('email not found') ||
+          msg.includes('user not found') ||
+          msg.includes('no user') ||
+          msg.includes('not registered') ||
+          // Supabase GoTrue v2 com enumerate_users=false retorna status diferente
+          probeError.status === 404;
+
+        if (emailNotFound) {
+          setError('Nenhuma conta encontrada com este e-mail.');
+          setLoading(false);
+          return;
+        }
+        // Se o erro for "Invalid login credentials", o e-mail existe — pode continuar.
+        // Qualquer outro erro inesperado também deixa prosseguir (fail-safe).
+      }
+
+      // E-mail existe (ou não conseguimos detectar): envia o link de redefinição.
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(authForm.email, {
         redirectTo: window.location.origin,
       });
