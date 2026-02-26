@@ -12,18 +12,45 @@ export function Auth({ onLogin }: { onLogin: (userId: string, userName: string) 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccessMsg('');
     setLoading(true);
 
     try {
       if (authMode === 'register') {
         if (!authForm.name.trim()) { setError('Informe seu nome.'); setLoading(false); return; }
+
+        // Pré-verificação de e-mail existente (Sonda)
+        const { error: probeError } = await supabase.auth.signInWithPassword({
+          email: authForm.email,
+          password: '__BOLSOFACIL_REGISTRATION_PROBE__',
+        });
+
+        if (probeError) {
+          const msg = probeError.message?.toLowerCase() ?? '';
+          const emailExists = msg.includes('invalid login credentials');
+          if (emailExists) {
+            setError('Este e-mail já está cadastrado. Tente fazer login.');
+            setLoading(false);
+            return;
+          }
+        }
+
         const { data, error: signUpError } = await supabase.auth.signUp({
           email: authForm.email,
           password: authForm.password,
           options: { data: { name: authForm.name } }
         });
         if (signUpError) throw signUpError;
-        if (data.user) onLogin(data.user.id, authForm.name);
+
+        if (data.user && !data.session) {
+          // Caso onde a confirmação de e-mail está habilitada
+          setSuccessMsg('Conta criada! Enviamos um e-mail de confirmação para sua caixa de entrada.');
+          setAuthMode('login');
+          setAuthForm(prev => ({ ...prev, password: '' }));
+        } else if (data.user && data.session) {
+          // Login automático se a confirmação estiver desabilitada
+          onLogin(data.user.id, authForm.name);
+        }
       } else {
         const { data, error: signInError } = await supabase.auth.signInWithPassword({
           email: authForm.email,
