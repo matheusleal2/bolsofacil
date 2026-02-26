@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Wallet, User, Lock, AlertCircle } from 'lucide-react';
+import { Wallet, User, Lock, AlertCircle, Mail, CheckCircle } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
 export function Auth({ onLogin }: { onLogin: (userId: string, userName: string) => void }) {
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authMode, setAuthMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [authForm, setAuthForm] = useState({ email: '', password: '', name: '' });
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -43,6 +44,31 @@ export function Auth({ onLogin }: { onLogin: (userId: string, userName: string) 
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccessMsg('');
+    if (!authForm.email.trim()) { setError('Informe seu e-mail.'); return; }
+    setLoading(true);
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(authForm.email, {
+        redirectTo: window.location.origin,
+      });
+      if (resetError) throw resetError;
+      setSuccessMsg('Link de redefinição enviado! Verifique sua caixa de entrada.');
+    } catch (err: any) {
+      setError(err?.message || 'Não foi possível enviar o e-mail. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const switchMode = (mode: 'login' | 'register' | 'forgot') => {
+    setAuthMode(mode);
+    setError('');
+    setSuccessMsg('');
+  };
+
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-sans relative overflow-hidden">
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/30 rounded-full mix-blend-screen filter blur-[100px] pointer-events-none"></div>
@@ -54,7 +80,9 @@ export function Auth({ onLogin }: { onLogin: (userId: string, userName: string) 
             <Wallet className="w-8 h-8" />
           </div>
           <h1 className="text-3xl font-bold tracking-tight">BolsoFácil</h1>
-          <p className="text-indigo-200 mt-2 text-sm">Seu controle financeiro inteligente</p>
+          <p className="text-indigo-200 mt-2 text-sm">
+            {authMode === 'forgot' ? 'Redefinição de senha' : 'Seu controle financeiro inteligente'}
+          </p>
         </div>
 
         {error && (
@@ -64,42 +92,100 @@ export function Auth({ onLogin }: { onLogin: (userId: string, userName: string) 
           </div>
         )}
 
-        <form onSubmit={handleAuth} className="space-y-4">
-          {authMode === 'register' && (
+        {successMsg && (
+          <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm px-4 py-3 rounded-xl mb-4">
+            <CheckCircle className="w-4 h-4 flex-shrink-0" />
+            {successMsg}
+          </div>
+        )}
+
+        {/* Tela: Esqueceu a Senha */}
+        {authMode === 'forgot' ? (
+          <form onSubmit={handleForgotPassword} className="space-y-4">
+            <p className="text-sm text-indigo-200 text-center -mt-2 mb-2">
+              Informe seu e-mail e enviaremos um link para você redefinir sua senha.
+            </p>
             <div>
-              <label className="block text-sm font-medium text-indigo-200 mb-1">Nome</label>
+              <label className="block text-sm font-medium text-indigo-200 mb-1">E-mail</label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-300" />
-                <input required type="text" value={authForm.name} onChange={e => setAuthForm({ ...authForm, name: e.target.value })} className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-400 focus:border-transparent outline-none transition-all text-white placeholder-indigo-300/50" placeholder="Seu nome" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-300" />
+                <input
+                  required
+                  type="email"
+                  value={authForm.email}
+                  onChange={e => setAuthForm({ ...authForm, email: e.target.value })}
+                  className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-400 focus:border-transparent outline-none transition-all text-white placeholder-indigo-300/50"
+                  placeholder="seu@email.com"
+                />
               </div>
             </div>
-          )}
-          <div>
-            <label className="block text-sm font-medium text-indigo-200 mb-1">E-mail</label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-300" />
-              <input required type="email" value={authForm.email} onChange={e => setAuthForm({ ...authForm, email: e.target.value })} className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-400 focus:border-transparent outline-none transition-all text-white placeholder-indigo-300/50" placeholder="seu@email.com" />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-indigo-200 mb-1">Senha</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-300" />
-              <input required type="password" value={authForm.password} onChange={e => setAuthForm({ ...authForm, password: e.target.value })} className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-400 focus:border-transparent outline-none transition-all text-white placeholder-indigo-300/50" placeholder="••••••••" />
-            </div>
-          </div>
 
-          <button type="submit" disabled={loading} className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium py-3 rounded-xl transition-colors mt-6 shadow-lg shadow-indigo-500/30 flex items-center justify-center gap-2">
-            {loading ? (
-              <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (authMode === 'login' ? 'Entrar' : 'Criar Conta')}
-          </button>
-        </form>
+            <button
+              type="submit"
+              disabled={loading || !!successMsg}
+              className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium py-3 rounded-xl transition-colors mt-2 shadow-lg shadow-indigo-500/30 flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : 'Enviar link de redefinição'}
+            </button>
+          </form>
+        ) : (
+          /* Telas: Login / Cadastro */
+          <form onSubmit={handleAuth} className="space-y-4">
+            {authMode === 'register' && (
+              <div>
+                <label className="block text-sm font-medium text-indigo-200 mb-1">Nome</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-300" />
+                  <input required type="text" value={authForm.name} onChange={e => setAuthForm({ ...authForm, name: e.target.value })} className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-400 focus:border-transparent outline-none transition-all text-white placeholder-indigo-300/50" placeholder="Seu nome" />
+                </div>
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-indigo-200 mb-1">E-mail</label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-300" />
+                <input required type="email" value={authForm.email} onChange={e => setAuthForm({ ...authForm, email: e.target.value })} className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-400 focus:border-transparent outline-none transition-all text-white placeholder-indigo-300/50" placeholder="seu@email.com" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-indigo-200 mb-1">Senha</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-300" />
+                <input required type="password" value={authForm.password} onChange={e => setAuthForm({ ...authForm, password: e.target.value })} className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-400 focus:border-transparent outline-none transition-all text-white placeholder-indigo-300/50" placeholder="••••••••" />
+              </div>
+              {authMode === 'login' && (
+                <div className="text-right mt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => switchMode('forgot')}
+                    className="text-xs text-indigo-300 hover:text-white transition-colors"
+                  >
+                    Esqueceu a senha?
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <button type="submit" disabled={loading} className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium py-3 rounded-xl transition-colors mt-6 shadow-lg shadow-indigo-500/30 flex items-center justify-center gap-2">
+              {loading ? (
+                <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (authMode === 'login' ? 'Entrar' : 'Criar Conta')}
+            </button>
+          </form>
+        )}
 
         <div className="mt-6 text-center">
-          <button onClick={() => { setAuthMode(authMode === 'login' ? 'register' : 'login'); setError(''); }} className="text-sm text-indigo-300 hover:text-white transition-colors">
-            {authMode === 'login' ? 'Não tem uma conta? Cadastre-se' : 'Já tem uma conta? Entre'}
-          </button>
+          {authMode === 'forgot' ? (
+            <button onClick={() => switchMode('login')} className="text-sm text-indigo-300 hover:text-white transition-colors">
+              ← Voltar ao login
+            </button>
+          ) : (
+            <button onClick={() => switchMode(authMode === 'login' ? 'register' : 'login')} className="text-sm text-indigo-300 hover:text-white transition-colors">
+              {authMode === 'login' ? 'Não tem uma conta? Cadastre-se' : 'Já tem uma conta? Entre'}
+            </button>
+          )}
         </div>
       </div>
     </div>
