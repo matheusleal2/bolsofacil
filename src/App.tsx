@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Trash2, ChevronLeft, ChevronRight, DollarSign, Users, Wallet, Coffee, Tag, Calendar, LogOut, TrendingUp, TrendingDown, Edit3, CreditCard as CreditCardIcon, Settings, X, List, Menu, PieChart } from 'lucide-react';
+import { Plus, Trash2, ChevronLeft, ChevronRight, DollarSign, Users, Wallet, Coffee, Tag, Calendar, LogOut, TrendingUp, TrendingDown, Edit3, CreditCard as CreditCardIcon, Settings, X, List, Menu, PieChart, Camera, Loader2 } from 'lucide-react';
 import { Auth } from './components/Auth';
 import { Expense, DailyExpense, Income, CreditCard, ExpenseGroup } from './types';
 import { supabase } from './supabaseClient';
 import { useSupabaseData } from './hooks/useSupabaseData';
+import { ReceiptScanner } from './components/ReceiptScanner';
 
 export default function App() {
   const [session, setSession] = useState<{ userId: string; userName: string } | null>(null);
@@ -98,6 +99,9 @@ function Dashboard({ userId, userName, onLogout }: { userId: string, userName: s
   const [isCardModalOpen, setIsCardModalOpen] = useState(false);
   const [cardForm, setCardForm] = useState({ name: '', closingDay: '', dueDay: '' });
 
+  const [isReceiptScannerOpen, setIsReceiptScannerOpen] = useState(false);
+  const [isParsingReceipt, setIsParsingReceipt] = useState(false);
+
   // Filters
   const [cardFilter, setCardFilter] = useState<'Todas' | 'Minhas' | 'Outros'>('Todas');
 
@@ -124,6 +128,35 @@ function Dashboard({ userId, userName, onLogout }: { userId: string, userName: s
     await addDailyExpense({ name: dailyForm.name, value: parseFloat(dailyForm.value), date: dailyForm.date, category: dailyForm.category });
     setDailyForm({ ...dailyForm, name: '', value: '' });
     setIsDailyModalOpen(false);
+  };
+
+  const handleScanReceipt = async (url: string) => {
+    setIsReceiptScannerOpen(false);
+    setIsParsingReceipt(true);
+
+    try {
+      // Chamada para a Edge Function do Supabase
+      const { data, error } = await supabase.functions.invoke('parse-receipt', {
+        body: { url }
+      });
+
+      if (error) throw error;
+
+      if (data) {
+        setDailyForm({
+          name: data.establishment || 'Gasto Nota Fiscal',
+          value: data.total.toString(),
+          date: data.date || new Date().toISOString().split('T')[0],
+          category: groups[0]?.categories[0] || ''
+        });
+        setIsDailyModalOpen(true);
+      }
+    } catch (err) {
+      console.error('Erro ao ler nota fiscal:', err);
+      alert('Não foi possível ler esta nota fiscal. Tente novamente ou insira manualmente.');
+    } finally {
+      setIsParsingReceipt(false);
+    }
   };
 
   const handleSetIncome = async (e: React.FormEvent) => {
@@ -415,6 +448,23 @@ function Dashboard({ userId, userName, onLogout }: { userId: string, userName: s
                 <span className="font-medium text-sm text-center">Gasto Diário</span>
               </button>
             </div>
+
+            <button
+              onClick={() => setIsReceiptScannerOpen(true)}
+              disabled={isParsingReceipt}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white p-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-xl shadow-indigo-500/20 group relative overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+              {isParsingReceipt ? (
+                <Loader2 className="w-6 h-6 animate-spin" />
+              ) : (
+                <Camera className="w-6 h-6" />
+              )}
+              <div className="text-left">
+                <p className="font-bold">Ler Nota Fiscal</p>
+                <p className="text-xs text-white/70">Adicione gastos escaneando o QR Code</p>
+              </div>
+            </button>
 
             {/* Ciclos */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -914,11 +964,25 @@ function Dashboard({ userId, userName, onLogout }: { userId: string, userName: s
           </div>
         </div>
       )}
+
+      {isReceiptScannerOpen && (
+        <ReceiptScanner
+          onScan={handleScanReceipt}
+          onClose={() => setIsReceiptScannerOpen(false)}
+        />
+      )}
     </div>
   );
 }
 
-function ExpenseCard({ expense, groupName, creditCards, onDelete }: { expense: Expense & { currentInstallment: number }, groupName?: string, creditCards: CreditCard[], onDelete: () => void | Promise<void> }) {
+interface ExpenseCardProps {
+  expense: Expense & { currentInstallment: number };
+  groupName?: string;
+  creditCards: CreditCard[];
+  onDelete: () => void | Promise<void>;
+}
+
+const ExpenseCard: React.FC<ExpenseCardProps> = ({ expense, groupName, creditCards, onDelete }) => {
   const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
   const dueDayDisplay = expense.creditCardId
@@ -962,9 +1026,9 @@ function ExpenseCard({ expense, groupName, creditCards, onDelete }: { expense: E
       </div>
     </div>
   );
-}
+};
 
-function PanoramaCard({ title, data, formatCurrency }: { title: string, data: { income: number, expense: number, balance: number }, formatCurrency: (v: number) => string }) {
+const PanoramaCard: React.FC<{ title: string, data: { income: number, expense: number, balance: number }, formatCurrency: (v: number) => string }> = ({ title, data, formatCurrency }) => {
   return (
     <div className="bg-white/5 backdrop-blur-md border border-white/10 p-6 rounded-3xl">
       <h3 className="text-lg font-bold text-slate-200 mb-4 pb-4 border-b border-white/10">{title}</h3>
@@ -986,4 +1050,4 @@ function PanoramaCard({ title, data, formatCurrency }: { title: string, data: { 
       </div>
     </div>
   );
-}
+};
