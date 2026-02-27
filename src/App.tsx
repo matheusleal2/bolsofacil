@@ -103,6 +103,17 @@ function Dashboard({ userId, userName, onLogout }: { userId: string, userName: s
   const [isReceiptScannerOpen, setIsReceiptScannerOpen] = useState(false);
   const [isParsingReceipt, setIsParsingReceipt] = useState(false);
 
+  // WhatsApp Profile
+  const [waPhone, setWaPhone] = useState('');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'success' | 'error' | null>(null);
+
+  useEffect(() => {
+    if (profile?.wa_phone) {
+      setWaPhone(profile.wa_phone);
+    }
+  }, [profile]);
+
   // Filters
   const [cardFilter, setCardFilter] = useState<'Todas' | 'Minhas' | 'Outros'>('Todas');
 
@@ -786,21 +797,43 @@ function Dashboard({ userId, userName, onLogout }: { userId: string, userName: s
                 Vincule seu número para registrar gastos enviando mensagens de texto.
               </p>
 
-              <div className="flex gap-2">
-                <div className="relative flex-1">
+              <div className="space-y-4">
+                <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                   <input
                     type="text"
-                    defaultValue={profile?.wa_phone || ''}
+                    value={waPhone}
+                    onChange={(e) => setWaPhone(e.target.value)}
                     placeholder="Ex: 5511999999999"
                     className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-white placeholder-slate-500"
-                    onBlur={(e) => {
-                      if (e.target.value !== profile?.wa_phone) {
-                        updateProfile(e.target.value);
-                      }
-                    }}
                   />
                 </div>
+                <button
+                  onClick={async () => {
+                    setIsSavingProfile(true);
+                    try {
+                      await updateProfile(waPhone);
+                      setSaveStatus('success');
+                      setTimeout(() => setSaveStatus(null), 3000);
+                    } catch (err) {
+                      setSaveStatus('error');
+                    } finally {
+                      setIsSavingProfile(false);
+                    }
+                  }}
+                  disabled={isSavingProfile || waPhone === profile?.wa_phone}
+                  className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:hover:bg-emerald-500 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+                >
+                  {isSavingProfile ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : saveStatus === 'success' ? (
+                    'Salvo com sucesso!'
+                  ) : saveStatus === 'error' ? (
+                    'Erro ao salvar'
+                  ) : (
+                    'Vincular Número'
+                  )}
+                </button>
               </div>
               <p className="text-xs text-slate-500 mt-3 italic">
                 Insira o número com DDI e DDD (somente números).
