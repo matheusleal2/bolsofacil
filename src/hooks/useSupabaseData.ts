@@ -9,17 +9,19 @@ export function useSupabaseData(userId: string) {
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [dailyExpenses, setDailyExpenses] = useState<DailyExpense[]>([]);
     const [incomes, setIncomes] = useState<Income[]>([]);
+    const [profile, setProfile] = useState<{ wa_phone: string } | null>(null);
     const [loading, setLoading] = useState(true);
 
     // ─── Fetch all data ────────────────────────────────────────────────────────
     const fetchAll = useCallback(async () => {
         setLoading(true);
-        const [groupsRes, cardsRes, expensesRes, dailyRes, incomesRes] = await Promise.all([
+        const [groupsRes, cardsRes, expensesRes, dailyRes, incomesRes, profilesRes] = await Promise.all([
             supabase.from('expense_groups').select('*').eq('user_id', userId),
             supabase.from('credit_cards').select('*').eq('user_id', userId),
             supabase.from('expenses').select('*').eq('user_id', userId),
             supabase.from('daily_expenses').select('*').eq('user_id', userId),
             supabase.from('incomes').select('*').eq('user_id', userId),
+            supabase.from('profiles').select('wa_phone').eq('id', userId).single(),
         ]);
 
         // Map snake_case → camelCase
@@ -48,6 +50,7 @@ export function useSupabaseData(userId: string) {
         setExpenses((expensesRes.data || []).map(mapExpense));
         setDailyExpenses((dailyRes.data || []).map(mapDaily));
         setIncomes((incomesRes.data || []).map(mapIncome));
+        setProfile(profilesRes.data || null);
         setLoading(false);
     }, [userId]);
 
@@ -146,6 +149,12 @@ export function useSupabaseData(userId: string) {
         }
     };
 
+    // ─── Profiles ──────────────────────────────────────────────────────────────
+    const updateProfile = async (wa_phone: string) => {
+        const { error } = await supabase.from('profiles').upsert({ id: userId, wa_phone });
+        if (!error) setProfile({ wa_phone });
+    };
+
     return {
         loading,
         groups, addGroup, removeGroup, addCategory, removeCategory,
@@ -153,5 +162,6 @@ export function useSupabaseData(userId: string) {
         expenses, addExpense, deleteExpense,
         dailyExpenses, addDailyExpense, deleteDailyExpense,
         incomes, setIncome,
+        profile, updateProfile,
     };
 }

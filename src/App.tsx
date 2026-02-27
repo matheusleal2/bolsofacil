@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Trash2, ChevronLeft, ChevronRight, DollarSign, Users, Wallet, Coffee, Tag, Calendar, LogOut, TrendingUp, TrendingDown, Edit3, CreditCard as CreditCardIcon, Settings, X, List, Menu, PieChart, Camera, Loader2 } from 'lucide-react';
+import { Plus, Trash2, ChevronLeft, ChevronRight, DollarSign, Users, Wallet, Coffee, Tag, Calendar, LogOut, TrendingUp, TrendingDown, Edit3, CreditCard as CreditCardIcon, Settings, X, List, Menu, PieChart, Camera, Loader2, MessageSquare, Phone } from 'lucide-react';
 import { Auth } from './components/Auth';
 import { Expense, DailyExpense, Income, CreditCard, ExpenseGroup } from './types';
 import { supabase } from './supabaseClient';
@@ -67,6 +67,7 @@ function Dashboard({ userId, userName, onLogout }: { userId: string, userName: s
     expenses, addExpense, deleteExpense,
     dailyExpenses, addDailyExpense, deleteDailyExpense,
     incomes, setIncome,
+    profile, updateProfile,
   } = useSupabaseData(userId);
 
   // Modals & Forms
@@ -774,6 +775,36 @@ function Dashboard({ userId, userName, onLogout }: { userId: string, userName: s
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div className="bg-white/5 backdrop-blur-md border border-white/10 p-6 rounded-3xl">
+              <h3 className="text-lg font-bold flex items-center gap-2 mb-6">
+                <MessageSquare className="w-5 h-5 text-emerald-400" />
+                Integração WhatsApp
+              </h3>
+              <p className="text-sm text-slate-400 mb-6">
+                Vincule seu número para registrar gastos enviando mensagens de texto.
+              </p>
+
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <input
+                    type="text"
+                    defaultValue={profile?.wa_phone || ''}
+                    placeholder="Ex: 5511999999999"
+                    className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-white placeholder-slate-500"
+                    onBlur={(e) => {
+                      if (e.target.value !== profile?.wa_phone) {
+                        updateProfile(e.target.value);
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-slate-500 mt-3 italic">
+                Insira o número com DDI e DDD (somente números).
+              </p>
             </div>
           </div>
         )}
